@@ -1,0 +1,9 @@
+<!-- Dont render the table headers as they are responsive fields handled by React -->
+<!-- dict.data structure is an array or the column values -->
+{% for row in df_dict %}
+    <tr>
+        {% for col in row %}
+            <td>{{col}}</td>
+        {% endfor %}
+    </tr>
+{% endfor %}
