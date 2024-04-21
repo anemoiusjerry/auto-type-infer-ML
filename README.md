@@ -1,6 +1,15 @@
 # Auto type inference for large spreadsheets
  Web App that takes spreadsheets and converts the columns to the correct datatypes automatically.
 
+ ## Quick Start
+ 1. Open project folder in VS Code
+ 2. cd server
+ 3. pipenv install
+ 4. python manage.py runserver
+ 5. cd ../client
+ 6. npm i
+ 7. npm start
+
  ## Thought process
  ### % of data analysed
  First thought was interating through every cell is obviously very slow and inefficient. How to avoid doing that? When a datatype has been inferred "n" times where n/total_rows >= 50% then we can stop and take this to be the correct datatype. Thus, avoiding analysing all rows.
