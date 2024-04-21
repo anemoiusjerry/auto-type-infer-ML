@@ -3,12 +3,13 @@
 
  ## Quick Start
  1. Open project folder in VS Code
- 2. cd server
- 3. pipenv install
- 4. python manage.py runserver
- 5. cd ../client
- 6. npm i
- 7. npm start
+ 2. "cd server"
+ 3. "pipenv shell" to start the virtual env
+ 4. "pipenv install" to install python modules
+ 5. "python manage.py runserver" to start the backend
+ 6. "cd ../client"
+ 7. "npm i" to install frontend packages
+ 8. "npm start" to start the front end
 
  ## Thought process
  ### % of data analysed
