@@ -32,3 +32,5 @@
 
  ### Misc Notes / difficulties faced
  Had issues where a lot fo columns were detected as category. Logically if there are numeric, datetime or complex number types detected at a significant portion then the column is likely to not be categorical. It simply has a lot of repeat values. Boolean and string types could be categorical so leave them out of the counting.
+
+ I intiially wanted to utilise Django templates more to demonstrate my knowledge, but due to lazy loading I had to switch to sending data only, which is the more preferred way these days anyway.
