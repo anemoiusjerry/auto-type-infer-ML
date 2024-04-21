@@ -92,10 +92,15 @@ def infer_data_types(count_dicts):
     combined_dict = {}
     for dict in count_dicts:
         for col, counts in dict.items():
-            if col in combined_dict:
-                combined_dict[col] + np.array(counts)
-            else:
-                combined_dict[col] = np.array(counts)
+            # If any unforeseen errors occur simply dont add and continue
+            # prioritise returning data as user can specify datatype
+            try:
+                if col in combined_dict:
+                    combined_dict[col] + np.array(counts)
+                else:
+                    combined_dict[col] = np.array(counts)
+            except:
+                pass
     
     inferred_data_types = [0] * len(combined_dict)
     # use col as index as dict does not guarantee order
