@@ -170,9 +170,7 @@ def convert_data_types(df, new_column_types, **kwargs):
 def check_numeric(value):
     try:
         # strip commas
-        if value == "757,504":
-            print("reee")
-        stripped = value.replace(",", "")
+        stripped = str(value).replace(",", "")
         num = float(stripped)
         if num.is_integer():
             return 1
@@ -208,7 +206,7 @@ def check_category(df_col, type_counts):
 
 def check_complex(value):
     try:
-        stripped = value.replace(",", "")
+        stripped = str(value).replace(",", "")
         stripped = value.replace("i", "j")
         complex(stripped)
         return True

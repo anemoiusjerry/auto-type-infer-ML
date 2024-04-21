@@ -28,3 +28,6 @@
  3. Split dataframe into chunks 
  4. Perform inference for datatypes and keep track of counts in a dictionary
  5. Aggregate the counts and pick the datatype with max count
+
+ ### Misc Notes / difficulties faced
+ Had issues where a lot fo columns were detected as category. Logically if there are numeric, datetime or complex number types detected at a significant portion then the column is likely to not be categorical. It simply has a lot of repeat values. Boolean and string types could be categorical so leave them out of the counting.
