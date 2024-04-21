@@ -34,13 +34,14 @@ def enumify(dtype):
         return 0
 
 def sample_df(df):
-    """ Random select a fraction of records in df 
+    """ Random select a fraction of records in df and fill nulls
         df: pandas dataframe
         frac: % of dataframe to be selected (in decimal)
         returns sampled dataframe
     """
     if df.shape[0] > CHUNK_SIZE:
-        return df.sample(frac=SAMPLE_SIZE).reset_index(drop=True)
+        df = df.sample(frac=SAMPLE_SIZE).reset_index(drop=True)
+    df.fillna("NA")
     return df
 
 def count_data_types(df):
@@ -49,15 +50,11 @@ def count_data_types(df):
         returns: dictionary of lists, key: column, value: list of counts where index is the type_id
     """
     global interrupt_process
-    print("process started")
+
+    # dict key: column index, value: array of counts with index == int code for pandas dtypes
     type_counts = {}
     for j in range(df.shape[1]):
-        # dict key: int code for pandas dtypes
         type_counts[j] = [0,0,0,0,0,0,0]
-        # check if category first as that works differently
-        if check_category(df.iloc[:,j]):
-            type_counts[j][5] = df.shape[0]
-            continue # no need to count other types
 
         # analyse each row count types
         for i in range(df.shape[0]):
@@ -81,7 +78,10 @@ def count_data_types(df):
                     type_counts[j][0] += 1
             except:
                 pass
-    print("finished")
+        
+        # check if category first as that works differently
+        if check_category(df.iloc[:,j], type_counts[j]):
+            type_counts[j] = [0,0,0,0,0,df.shape[0],0]
     return type_counts
 
 def infer_data_types(count_dicts):
@@ -105,9 +105,16 @@ def infer_data_types(count_dicts):
     inferred_data_types = [0] * len(combined_dict)
     # use col as index as dict does not guarantee order
     for col, counts in combined_dict.items():
-        inferred_data_types[col] = int(np.argmax(counts))
+        # index of np.array is the type code for data type
+        index_max_count = int(np.argmax(counts))
+        # if type is numeric and 1 value is float, then everything is float
+        if index_max_count == 1 and counts[2] > 0:
+            inferred_data_types[col] = 2
+        else:
+            inferred_data_types[col] = index_max_count
     return inferred_data_types
 
+# Note need to ensure all outputs are in javascript types eg np.nan not allowed
 def convert_data_types(df, new_column_types, **kwargs):
     """ Converts pandas dataframe to the specified types
         df: pandas dataframe
@@ -120,10 +127,13 @@ def convert_data_types(df, new_column_types, **kwargs):
         # Prioritise conversion output, if error then just leave it
         try:
             if type_code == 1 or type_code == 2:
-                # coerce errors to convert to NaN
+                # coerce to NaN - more predictable
+                df[col] = df[col].apply(lambda val: val.replace(",", ""))
                 df[col] = pd.to_numeric(df[col], errors='coerce')
+
             elif type_code == 3:
                 df[col] = df[col].astype(bool)
+
             elif type_code == 4:
                 try:
                     if (kwargs['format']):
@@ -133,34 +143,37 @@ def convert_data_types(df, new_column_types, **kwargs):
                 except ValueError as ve:
                     pattern = r"match format \"([^']*)\""
                     match = re.search(pattern, str(ve))
-                    date_format = match.group(1)
-                    # swtich the day and month - try again
-                    parts = date_format.split("%")
-                    for i in range(len(parts)):
-                        p = parts[i]
-                        if "m" in p:
-                            parts[i] = p.replace("m", "d")
-                        elif "d" in p:
-                            parts[i] = p.replace("d", "m")
-                    date_format = "%".join(parts)
+                    # try again if error is format related
+                    if match:
+                        date_format = match.group(1)
+                        swap_month_day(date_format)
+                        # coerce to NaT - more predictable
+                        df[col] = pd.to_datetime(df[col], format=date_format, errors='ignore')
+                    # otherwise coerce to NaT
+                    else:
+                        df[col] = pd.to_datetime(df[col], errors='coerce')
 
-                    df[col] = pd.to_datetime(df[col], format=date_format, errors='coerce')
-                    df[col] = df[col].replace(pd.NaT, "NA")
-                    
             elif type_code == 5:
-                df[col] = pd.Categorical(df[col])
+                df[col] = pd.Categorical(df[col].fillna("NA"))
+
             elif type_code == 6:
                 df[col] = df[col].apply(lambda x: np.complex(x))
+
             else:
                 df[col] = df[col].astype(str)
-        except:
+        except Exception as e:
+            #print(e)
             pass
     return df
 
 
 def check_numeric(value):
     try:
-        num = float(value)
+        # strip commas
+        if value == "757,504":
+            print("reee")
+        stripped = value.replace(",", "")
+        num = float(stripped)
         if num.is_integer():
             return 1
         return 2
@@ -179,16 +192,35 @@ def check_datetime(value):
     except:
         return False
 
-def check_category(df_col):
+def check_category(df_col, type_counts):
     """ Pass entire df column
+        df_col: dataframe column data as series
+        type_counts: array of counts for all other datatypes
     """
+    
+    # if total count of data types thats not string is signigicant (25%)
+    # then its probably not a category
+    if (type_counts[1] + type_counts[2] + type_counts[4] + type_counts[6])/len(df_col) > 0.25:
+        return False
     if len(df_col.unique()) / len(df_col) < 0.5:  # Example threshold for categorization
         return True
     return False
 
 def check_complex(value):
     try:
-        complex(value.replace("i", "j"))
+        stripped = value.replace(",", "")
+        stripped = value.replace("i", "j")
+        complex(stripped)
         return True
     except:
         return False
+    
+def swap_month_day(datetime_format):
+    parts = datetime_format.split("%")
+    for i in range(len(parts)):
+        p = parts[i]
+        if "m" in p:
+            parts[i] = p.replace("m", "d")
+        elif "d" in p:
+            parts[i] = p.replace("d", "m")
+    return "%".join(parts)

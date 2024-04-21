@@ -1,11 +1,11 @@
-from django.shortcuts import render
 from django.http import JsonResponse, HttpResponse
 from django.template.loader import render_to_string
 from django.middleware.csrf import get_token
 import pandas as pd
 from multiprocessing import Pool
-from .library.helper import sample_df, count_data_types, infer_data_types, convert_data_types, CHUNK_SIZE
+from .library.helper import enumify, sample_df, count_data_types, infer_data_types, convert_data_types, CHUNK_SIZE
 from .library.helper import lock, interrupt_process
+import traceback
 
 # Create your views here.
 def upload_spreadsheet(request):
@@ -44,6 +44,18 @@ def upload_spreadsheet(request):
             pool.close()
             pool.join()
             df = pd.concat(output)
+
+            # final processing to ensure fontend can display data
+            # convert to string here to preserve df data for processing (assumption made by me)
+            # obviously it will be more efficient to covnert to string within the convert_data_types function
+            for col in df.columns:
+                coltype = enumify(df[col].dtype)
+                # convert bool and complex types to strings,
+                if coltype == 2 or coltype == 6:
+                    df[col] = df[col].astype(str)
+                elif coltype != 5:
+                    df[col] = df[col].fillna("NA")
+
             df_dict = df.to_dict(orient='split')
 
             # # Convert to html viewable template
@@ -54,6 +66,8 @@ def upload_spreadsheet(request):
             return JsonResponse({"data": df_dict, "dtypes": inferred_dtypes}, status=200)
         
         except Exception as e:
+            stack_trace = traceback.format_exc()
+            print(stack_trace)
             return HttpResponse(str(e), status=500)
     
     return HttpResponse("Error: no file detected", status=500)

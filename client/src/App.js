@@ -19,13 +19,14 @@ function App() {
   const { signal } = controller;
   const tableBodyRef = useRef(null);
 
+  const [init, setInit] = useState(false);
   const [csrfToken, setCsrfToken] = useState();
   const [error, setError] = useState("An error occurred");
   const [loading, setLoading] = useState(false);
   const [file, setFile] = useState();
 
   // form fields validity
-  const [inValid, setInValid] = useState();
+  const [inValid, setInValid] = useState(false);
   // const [tableBody, setTableBody] = useState();
   const [columns, setColumns] = useState([]);
   const [rows, setRows] = useState([]);
@@ -44,60 +45,69 @@ function App() {
     .then(token => setCsrfToken(token.csrfToken));
   }, []);
 
-  const processUpload = async (file, newDataTypes = []) => {
-    setLoading(true);
-    // Allow single uploads only
-    if (spreadsheetTypes.includes(file.type)) {
-      setFile(file);
-      setInValid(false);
-
-      let formData = new FormData();
-      formData.append('spreadsheet', file);
-      if (newDataTypes) {
-        formData.append('columntypes', newDataTypes);
-      }
-
-      try {
-        const res = await fetch('api/uploadspreadsheet', {
-          signal,
-          method: 'POST',
-          headers: {'X-CSRFToken': csrfToken},
-          body: formData
-        })
-      
-        if (res.ok) {
-          const data = await res.json();
-          // setTableBody(data.html);
-          setColumns(data.data.columns);
-          setRows(data.data.data);
-          setDtypes(data.dtypes);
-          setDtformats(new Array(data.dtypes.length).fill(""));
-        }
-        else {
-          setError(res.text);
-          setInValid(true);
-        }
-      } catch (error) {
-        setError(error.message);
-        console.error(error.message);
+  // show toast message whenever validity is changed
+  useEffect(() => {
+    // Run only after initial render
+    if (init) { 
+      if (!loading) {
+        setShowToast(true) 
       }
     }
     else {
-      setError("Only CSV and excel like documents allowed.")
-      setInValid(true);
+      setInit(true)
     }
-    setShowToast(true);
+  }, [inValid])
+
+  const processUpload = async (file, newDataTypes = []) => {
+    setLoading(true);
+
+    let formData = new FormData();
+    formData.append('spreadsheet', file);
+    if (newDataTypes) {
+      formData.append('columntypes', newDataTypes);
+    }
+
+    try {
+      const res = await fetch('api/uploadspreadsheet', {
+        signal,
+        method: 'POST',
+        headers: {'X-CSRFToken': csrfToken},
+        body: formData
+      })
+
+      if (res.ok) {
+        const data = await res.json();
+        console.log(data);
+        // setTableBody(data.html);
+        setColumns(data.data.columns);
+        setRows(data.data.data);
+        setDtypes(data.dtypes);
+        setDtformats(new Array(data.dtypes.length).fill(""));
+        setInValid(false);
+      }
+      else {
+        setError(await res.text());
+        setInValid(true);
+      }
+    } catch (error) {
+      setError(error.message);
+      setInValid(true);
+      console.error(error);
+    }
     setLoading(false);
-    console.log("done")
   }
 
   const _handleUpload = async (files) => {
     // allow uploading of one file only
-    if (files.length > 1) {
-      setError("Please select only 1 file!");
+    if (files.length == 1 && spreadsheetTypes.includes(files[0].type)) {
+      const file = files[0]
+      setFile(file);
+      setInValid(false);
+      await processUpload(file);
     }
-    else { 
-      await processUpload(files[0]);
+    else {
+      setError("Please select only 1 file, file must be CSV or excel like format!");
+      setInValid(true);
     }
   }
 
@@ -107,7 +117,6 @@ function App() {
       if (res.ok) {
         setError("Cancelled");
         setInValid(true);
-        setShowToast(true);
       }
     })
   }
