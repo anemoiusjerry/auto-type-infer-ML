@@ -1,31 +1,42 @@
 import './App.css';
-import { useState, useEffect } from 'react';
-import {Button, Form, Table, Spinner} from 'react-bootstrap';
+import React, { createContext, useState, useEffect, useRef } from 'react';
+import { Form, Table, Spinner } from 'react-bootstrap';
+import ReplayIcon from '@mui/icons-material/Replay';
+import HighlightOffIcon from '@mui/icons-material/HighlightOff';
+
+import { DatetimeHeader } from './components/DatetimeHeader';
+import { TableHeader } from './components/TableHeader';
+import { AutoDismissToast } from './components/AutoDismissToast';
+import { IconButton } from './components/IconButton';
+import { LazyTable } from './components/LazyTable';
+
+export const DataTypeContext = createContext();
 
 function App() {
-  // pandas datatype codes
-  const dtypeOptions = [
-    {value: 0, name: "Text"},
-    {value: 1, name: "Whole Number (int)"},
-    {value: 2, name: "Real Number (float)"},
-    {value: 3, name: "True/False (bool)"},
-    {value: 4, name: "Datetime"},
-    {value: 5, name: "Categorical"},
-    {value: 6, name: "Complex Number"},
-  ]
   // mimeTypes
   const spreadsheetTypes = ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel', 'text/csv'];
+  const controller = new AbortController();
+  const { signal } = controller;
+  const tableBodyRef = useRef(null);
 
   const [csrfToken, setCsrfToken] = useState();
-  const [error, setError] = useState("");
+  const [error, setError] = useState("An error occurred");
   const [loading, setLoading] = useState(false);
   const [file, setFile] = useState();
+
   // form fields validity
   const [inValid, setInValid] = useState();
-  const [tableBody, setTableBody] = useState();
+  // const [tableBody, setTableBody] = useState();
   const [columns, setColumns] = useState([]);
+  const [rows, setRows] = useState([]);
+  const [nDisp, setnDisp] = useState(500);
+  // data type ids
   const [dtypes, setDtypes] = useState([]);
-  const [changed, setChanged] = useState(false);
+  // Datetime formats
+  const [dtformats, setDtformats] = useState([]);
+
+  // Toast state
+  const [showToast, setShowToast] = useState(false);
 
   useEffect(() => {
     fetch('/api/gettoken')
@@ -34,6 +45,7 @@ function App() {
   }, []);
 
   const processUpload = async (file, newDataTypes = []) => {
+    setLoading(true);
     // Allow single uploads only
     if (spreadsheetTypes.includes(file.type)) {
       setFile(file);
@@ -42,12 +54,12 @@ function App() {
       let formData = new FormData();
       formData.append('spreadsheet', file);
       if (newDataTypes) {
-        console.log(newDataTypes)
         formData.append('columntypes', newDataTypes);
       }
 
       try {
         const res = await fetch('api/uploadspreadsheet', {
+          signal,
           method: 'POST',
           headers: {'X-CSRFToken': csrfToken},
           body: formData
@@ -55,10 +67,11 @@ function App() {
       
         if (res.ok) {
           const data = await res.json();
-          console.log(data);
-          setTableBody(data.html);
-          setColumns(data.columns);
+          // setTableBody(data.html);
+          setColumns(data.data.columns);
+          setRows(data.data.data);
           setDtypes(data.dtypes);
+          setDtformats(new Array(data.dtypes.length).fill(""));
         }
         else {
           setError(res.text);
@@ -70,29 +83,43 @@ function App() {
       }
     }
     else {
-      setError("Only CSV and excel like documents, thank you.")
+      setError("Only CSV and excel like documents allowed.")
       setInValid(true);
     }
+    setShowToast(true);
+    setLoading(false);
+    console.log("done")
   }
 
   const _handleUpload = async (files) => {
-    setLoading(true);
     // allow uploading of one file only
     if (files.length > 1) {
       setError("Please select only 1 file!");
     }
     else { 
-      await processUpload(files[0]) 
+      await processUpload(files[0]);
     }
-    setLoading(false);
   }
-  
-  const _handleManualTypeDef = (index, optVal) => {
-    let newDtypes = [...dtypes];
-    newDtypes[index] = optVal;
-    setDtypes(newDtypes);
-    console.log(newDtypes)
-    setChanged(true);
+
+  const _cancelProcessing = () => {
+    controller.abort();
+    fetch('api/cancelprocess').then(res => {
+      if (res.ok) {
+        setError("Cancelled");
+        setInValid(true);
+        setShowToast(true);
+      }
+    })
+  }
+
+  // Detect end of scroll to load more data into UI
+  const _handleScroll = () => {
+      if(tableBodyRef.current){
+        const {clientHeight, scrollTop, scrollHeight} = tableBodyRef.current;
+        if (clientHeight + scrollTop >= scrollHeight) {
+          setnDisp(nDisp + 500);
+        }
+      }
   }
 
   return (
@@ -108,42 +135,52 @@ function App() {
             onClick={e => e.target.value = null}
             isInvalid={inValid} 
           />
-          <Form.Control.Feedback type="invalid">
-            {error}
-          </Form.Control.Feedback>
         </Form.Group>
+        
         <div className="align-self-end">
-          <Button className="ms-2" disabled={!changed} onClick={() => processUpload(file, dtypes)}>Process Again</Button>
+          <IconButton label="Process again" icon={<ReplayIcon/>} _onClick={() => processUpload(file, dtypes)} />
+          <IconButton label="Cancel" icon={<HighlightOffIcon/>} _onClick={_cancelProcessing} />
         </div>
       </Form>
 
       <br/>
 
       {/* Displaying processed data */}
-      {loading ? <Spinner animation='grow'/>:
-       <Table striped bordered variant="dark">
-       <thead>
-         {/* header row 1, name */}
-         <tr>
-           {columns.map(header => <th key={`header-${header}`}>{header}</th>)}
-         </tr>
+      {loading ? <Spinner animation='grow'/> :
+      <div className="scrollable-table" ref={tableBodyRef} onScroll={_handleScroll}>
+        <Table striped bordered variant="dark" style={{fontSize:15}} >
+          <thead style={{ position:"sticky", top:0}}>
+            {/* header row 1, name */}
+            <tr>
+              {columns.map(header => <th key={`header-${header}`}>{header}</th>)}
+            </tr>
 
-         {/* header row 2, type select */}
-         <tr>
-           {columns.map((header,index) => 
-             <th key={`select-${header}`}>
-               <Form.Select value={dtypes[index]} onChange={e => _handleManualTypeDef(index, Number(e.target.value))}>
-                 {dtypeOptions.map(opt => 
-                   <option key={opt.value} value={opt.value}>{opt.name}</option>
-                 )}
-               </Form.Select>
-             </th>
-           )}
-         </tr>
-       </thead>
-       <tbody dangerouslySetInnerHTML={{__html: tableBody}}></tbody>
-     </Table>
+            {/* header row 2, type select */}
+            <DataTypeContext.Provider value={{dtypes, setDtypes, dtformats, setDtformats}}>
+              <tr>
+                {columns.map((header,index) => dtypes[index] === 4 ? 
+                  <DatetimeHeader key={`select-${header}`} index={index} /> :
+                  <TableHeader key={`select-${header}`} index={index} />
+                )}
+              </tr>
+            </DataTypeContext.Provider>
+          </thead>
+
+          <tbody>
+            <LazyTable data={rows} numRows={nDisp}/>
+          </tbody>
+
+          {/* <tbody dangerouslySetInnerHTML={{__html: tableBody}}></tbody> */}
+        </Table>
+      </div>
       }
+
+      <AutoDismissToast 
+        show={showToast} 
+        setShow={setShowToast} 
+        success={!inValid} 
+        message={inValid ? error : "Processing complete!"} 
+      />
     </div>
   );
 }

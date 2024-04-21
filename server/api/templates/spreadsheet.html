@@ -3,7 +3,12 @@
 {% for row in df_dict %}
     <tr>
         {% for col in row %}
-            <td>{{col}}</td>
+            <!-- Check for null value -->
+            {% if col %}
+                <td>{{col}}</td>
+            {% else %}
+                <td>NA</td>
+            {% endif %}
         {% endfor %}
     </tr>
 {% endfor %}
