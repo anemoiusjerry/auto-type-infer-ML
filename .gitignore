@@ -291,3 +291,6 @@ src/TestExternalAD/TestExternalAD/Properties/ServiceDependencies/wwx-prod-portal
 /DemoPortalSiteSetup
 
 .DS_Store
+
+*.tar
+*.zip
