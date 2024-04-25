@@ -9,9 +9,9 @@ if that doesnt work download the images and yaml from
 https://drive.google.com/file/d/1noRbM54WlZv9qclDh5cuGu7TZ95dAcUf/view?usp=share_link
 
 and run the following commands
-docker load -i jerry-backend.tar
-docker load -i jerry-frontend.tar
-docker-compose up
+- docker load -i jerry-backend.tar
+- docker load -i jerry-frontend.tar
+- docker-compose up
 
  ## Quick Start
  1. Open project folder in VS Code
