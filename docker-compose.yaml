@@ -1,0 +1,15 @@
+services:
+  api:
+    build: ./server
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./server:/server
+    command: bash -c "python manage.py runserver 0.0.0.0:8000"
+
+  frontend:
+    build: ./client
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./client:/client

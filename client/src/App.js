@@ -40,9 +40,14 @@ function App() {
   const [showToast, setShowToast] = useState(false);
 
   useEffect(() => {
-    fetch('/api/gettoken')
+    fetch('http://127.0.0.1:8000/api/gettoken')
     .then(res => res.json())
-    .then(token => setCsrfToken(token.csrfToken));
+    .then(token => {
+      //console.log(token)
+      setCsrfToken(token.csrfToken)
+    }).catch(err => {
+      console.log(err)
+    });
   }, []);
 
   // show toast message whenever validity is changed
@@ -68,8 +73,9 @@ function App() {
     }
 
     try {
-      const res = await fetch('api/uploadspreadsheet', {
-        signal,
+      console.log(csrfToken)
+      const res = await fetch('http://127.0.0.1:8000/api/uploadspreadsheet', {
+        //signal,
         method: 'POST',
         headers: {'X-CSRFToken': csrfToken},
         body: formData
@@ -99,7 +105,7 @@ function App() {
 
   const _handleUpload = async (files) => {
     // allow uploading of one file only
-    if (files.length == 1 && spreadsheetTypes.includes(files[0].type)) {
+    if (files.length === 1 && spreadsheetTypes.includes(files[0].type)) {
       const file = files[0]
       setFile(file);
       setInValid(false);
@@ -113,7 +119,7 @@ function App() {
 
   const _cancelProcessing = () => {
     controller.abort();
-    fetch('api/cancelprocess').then(res => {
+    fetch('http://127.0.0.1:8000/api/cancelprocess').then(res => {
       if (res.ok) {
         setError("Cancelled");
         setInValid(true);

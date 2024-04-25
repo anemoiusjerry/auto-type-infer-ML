@@ -6,7 +6,9 @@ from multiprocessing import Pool
 from .library.helper import enumify, sample_df, count_data_types, infer_data_types, convert_data_types, CHUNK_SIZE
 from .library.helper import lock, interrupt_process
 import traceback
+from django.views.decorators.csrf import csrf_exempt
 
+@csrf_exempt
 # Create your views here.
 def upload_spreadsheet(request):
     if (request.method == 'POST' and request.FILES['spreadsheet']):
@@ -72,6 +74,7 @@ def upload_spreadsheet(request):
     
     return HttpResponse("Error: no file detected", status=500)
 
+@csrf_exempt
 def cancel_processing(request):
     with lock:
         interrupt_process.value = True
